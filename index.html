@@ -1,0 +1,444 @@
+import { useState, useEffect } from "react";
+
+const SCHEDULE = [
+  { start:"05:00",end:"06:00",task:"Wake Protocol",category:"Physical",
+    green:["Silence CPAP alarm","Remove CPAP mask","Drink 16oz water immediately","Take morning meds: Lithium 1200mg, Caplyta 42mg, D3, Omega-3, Multivitamin"],
+    yellow:["Silence CPAP alarm","Remove CPAP mask","Sit up — wait 60 seconds","Drink 8oz water","Take morning meds"],
+    red:["Take 3 slow breaths before moving","Reach for CPAP power — press off","Remove mask — pause 30s","Sit at bed edge","Wait 2 full minutes","Stand slowly — hand on wall","Walk to water","Drink 4oz","Locate meds","Take one pill — pause — repeat"]},
+  { start:"06:00",end:"07:30",task:"Morning Sun & Journal",category:"Emotional",
+    green:["Step outside — shade only — 90 min","Gratitude journal: 3 entries minimum","Dreaming Spanish: 20 min passive input"],
+    yellow:["Step outside — shade — 30 min","Write 1 journal entry","Dreaming Spanish: 10 min"],
+    red:["Open door — feel air","Step onto porch — sit in shade","Close eyes 5 min","Write 1 sentence in journal"]},
+  { start:"07:30",end:"08:30",task:"Breakfast & Hydration",category:"Physical",
+    green:["Drink 16oz water before eating","Low-sodium / no-soy breakfast","Coffee 1 cup","Optional: Kombucha or Mushroom Elixir"],
+    yellow:["Drink 8oz water","Simple low-sodium meal","Coffee 1 cup"],
+    red:["Pour 4oz water — drink it","Get one food item — no prep required","Eat slowly — no standing required"]},
+  { start:"08:30",end:"10:00",task:"TryHackMe Study",category:"Intellectual",
+    green:["Review prior session notes (5 min)","Complete 1–2 modules on 3-month path","Write key takeaways","Transition: Dreaming Spanish 20 min"],
+    yellow:["Open TryHackMe — existing path only","Complete 1 module max — 15 min cap","Dreaming Spanish: 10 min passive only"],
+    red:["Open TryHackMe","Read 1 challenge description only","Close app — rest"]},
+  { start:"10:00",end:"12:00",task:"Crunch Gym / Resistance Bands",category:"Physical",
+    green:["Drive to Crunch Gym","Warm-up: 5 min flat walk","Yellow band: pull-aparts x15 (no overhead)","Blue band: seated row 3×12","Red band: hip bridge 3×15","Green band: lateral walk 3×10","Calf raises 3×20","15–20 min sauna — hydrate 16oz first","HARD STOP: no overhead, no weighted vest"],
+    yellow:["Home bands only — Yellow + Blue","Seated row x10","Hip bridge x10","Calf raises x15","10 min flat walk","No sauna today"],
+    red:["Yellow band only — seated","5 pull-aparts — stop","Rest 3 min","5 more if tolerated","Lie down — no sauna — no gym"]},
+  { start:"12:00",end:"13:00",task:"Lunch & Recovery",category:"Physical",
+    green:["Drink 16oz water with meal","Low-sodium / no-soy lunch","20 min rest horizontal after eating"],
+    yellow:["Drink 8oz water","Simple low-sodium meal","30 min rest"],
+    red:["Drink 4oz water","Eat small portion — no prep","Lie down immediately after"]},
+  { start:"13:00",end:"14:30",task:"Pet Care",category:"Environmental",
+    green:["Feed 3 cats + 1 dog","Clean all litter boxes","Refresh all water bowls","10 min low-impact dog play"],
+    yellow:["Feed cats + dog","Check water bowls","Skip litter if back pain >4"],
+    red:["Fill one food bowl only","Ask Regla for remaining tasks","Return to rest"]},
+  { start:"14:30",end:"16:00",task:"House Chores",category:"Environmental",
+    green:["One chore zone: kitchen OR living OR bedroom","15 min max standing per session","Sit break every 10 min (back protocol)"],
+    yellow:["5 min seated task only","No extended standing","One small task — stop"],
+    red:["Zero chores — recovery state","Inform Regla of system state"]},
+  { start:"16:00",end:"17:00",task:"Dad Call Window",category:"Social",
+    green:["Call Dad — window: 16:00–21:00","20–30 min conversation","No combat media discussion"],
+    yellow:["Text Dad a check-in message only"],
+    red:["Rest — contact tomorrow"]},
+  { start:"17:00",end:"19:00",task:"Brother Call Window",category:"Social",
+    green:["Call Brother — window: 17:00–20:00","20 min conversation"],
+    yellow:["Text only"],
+    red:["Rest"]},
+  { start:"19:00",end:"20:00",task:"Sister Call Window",category:"Social",
+    green:["Call Sister — window: 19:00–21:00","20 min conversation"],
+    yellow:["Text only"],
+    red:["Rest"]},
+  { start:"20:00",end:"21:00",task:"Dinner & Wife Time",category:"Social",
+    green:["Low-sodium dinner with Regla","Date Night if scheduled block active","No phones during dinner","Intimacy: wife-centric scheduled block only"],
+    yellow:["Simple dinner together","Low stimulation — no demands"],
+    red:["Eat small meal","Rest beside Regla — no performance demands"]},
+  { start:"21:00",end:"22:30",task:"Wind-Down Protocol",category:"Physical",
+    green:["No screens 60 min before sleep","Melatonin 300mcg","CPAP full setup + seal check","PRN: Trazodone 100mg if needed"],
+    yellow:["Dim all lights now","Melatonin 300mcg","CPAP ready","Trazodone 100mg if sleep delay >20 min"],
+    red:["Lights off immediately","CPAP on now","Hydroxyzine 50mg for anxiety","Clonazepam 1mg if no sleep in 45 min (PRN)"]},
+  { start:"22:30",end:"05:00",task:"Sleep",category:"Physical",
+    green:["CPAP active — seal confirmed","Target 8 hours","Blackout environment"],
+    yellow:["CPAP active","Trazodone 100mg PRN"],
+    red:["CPAP on now","Hydroxyzine + Trazodone PRN","Clonazepam if no sleep in 45 min"]}
+];
+
+const Q_GROUPS = {
+  "Biological / Atomic":[
+    {id:"age",label:"Age",type:"number",val:"39"},
+    {id:"weight",label:"Weight (lbs)",type:"number",val:"270"},
+    {id:"hydration",label:"Oz water consumed today",type:"number",val:"4"},
+    {id:"sleep",label:"Hours slept last night",type:"number",val:"5"},
+    {id:"pain_shoulder",label:"Shoulder pain (0–10)",type:"range",val:"4",min:"0",max:"10"},
+    {id:"pain_knee",label:"Knee pain (0–10)",type:"range",val:"3",min:"0",max:"10"},
+    {id:"pain_back",label:"Back pain (0–10)",type:"range",val:"2",min:"0",max:"10"},
+    {id:"rhr",label:"Resting Heart Rate",type:"number",val:"85"},
+  ],
+  "Mental Health / Diagnosis":[
+    {id:"bipolar_phase",label:"Bipolar Phase",type:"select",val:"stable",opts:["stable","manic","depressive","hypomanic"]},
+    {id:"ptsd",label:"PTSD Trigger Sensitivity (0–10)",type:"range",val:"7",min:"0",max:"10"},
+    {id:"depression",label:"Depression / Lethargy (0–10)",type:"range",val:"2",min:"0",max:"10"},
+    {id:"anxiety",label:"Anxiety / Worry Loop (%)",type:"range",val:"80",min:"0",max:"100"},
+    {id:"mood_notes",label:"Mood Notes (optional)",type:"text",val:""},
+  ],
+  "Financial / Wellness":[
+    {id:"fin_stress",label:"Financial Stress (0–10)",type:"range",val:"6",min:"0",max:"10"},
+    {id:"spain_saved",label:"Spain Fund Current ($)",type:"number",val:"1761"},
+    {id:"goal",label:"Today's Primary Focus",type:"select",val:"health",opts:["health","education","financial","social","rest"]},
+  ]
+};
+
+const PROOFS = (s,a) => [
+  `Stochastic model active — symptom mode [${s.toUpperCase()}] — granularity CONFIRMED`,
+  `Atomic precondition: Hydration ${a.hydration||0}oz logged — target 64oz — FLAG: INCREASE`,
+  `Bipolar phase [${a.bipolar_phase||"stable"}] — medication compliance verification ACTIVE`,
+  `PTSD trigger sensitivity [${a.ptsd||7}/10] — environment and media filters ENGAGED`,
+  `Sleep debt: ${a.sleep||5}hrs logged — CNS recovery target 8hrs — deficit: ${Math.max(0,8-(a.sleep||5))}hrs`,
+  `Multiscale biological check: shoulder [${a.pain_shoulder||4}/10] — back [${a.pain_back||2}/10] — knee [${a.pain_knee||3}/10]`,
+  `8-Dimension wellness audit: Emotional | Physical | Intellectual | Social loops ACTIVE`,
+  `Forever Life projection: low-risk protocol consistency = +8.3yr healthspan estimate`,
+  `Second-order cybernetic loop: self-correcting based on current symptom state [${s}]`,
+  `Infinite future optimization: every micro-step compounds — Literalist Rule ENFORCED`,
+];
+
+function toMins(t){const[h,m]=t.split(":").map(Number);return h*60+m;}
+
+function getCurrentEntry(now){
+  const m=now.getHours()*60+now.getMinutes();
+  for(const e of SCHEDULE){
+    const s=toMins(e.start),en=toMins(e.end);
+    if(s<en){if(m>=s&&m<en)return{entry:e,endMins:en};}
+    else{if(m>=s||m<en)return{entry:e,endMins:en+1440};}
+  }
+  return{entry:SCHEDULE[SCHEDULE.length-1],endMins:toMins(SCHEDULE[SCHEDULE.length-1].end)+1440};
+}
+
+const SC = {
+  green:{bg:"#e6f9f0",text:"#085041",border:"#1d9e75",label:"Optimal"},
+  yellow:{bg:"#fdf8e8",text:"#633806",border:"#ba7517",label:"Medium Stress"},
+  red:{bg:"#fcebeb",text:"#791f1f",border:"#e24b4a",label:"High Symptom / Crisis"}
+};
+
+function Tag({children,type="neutral"}){
+  const s={neutral:{bg:"var(--color-background-secondary)",color:"var(--color-text-secondary)"},
+    open:{bg:"#e6f9f0",color:"#085041"},closed:{bg:"var(--color-background-secondary)",color:"var(--color-text-tertiary)"},
+    warn:{bg:"#fcebeb",color:"#791f1f"}};
+  const c=s[type]||s.neutral;
+  return<span style={{fontSize:"11px",padding:"2px 8px",borderRadius:"var(--border-radius-md)",background:c.bg,color:c.color,whiteSpace:"nowrap",marginLeft:"6px"}}>{children}</span>;
+}
+
+function Row({label,sub,tag,tagType,last}){
+  return(
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"8px 0",borderBottom:last?"none":"0.5px solid var(--color-border-tertiary)"}}>
+      <div style={{flex:1,marginRight:"8px"}}>
+        <p style={{fontSize:"14px",margin:0,lineHeight:"1.4"}}>{label}</p>
+        {sub&&<p style={{fontSize:"12px",color:"var(--color-text-secondary)",margin:"2px 0 0"}}>{sub}</p>}
+      </div>
+      {tag&&<Tag type={tagType}>{tag}</Tag>}
+    </div>
+  );
+}
+
+function Sec({title,children}){
+  return(
+    <div style={{marginBottom:"18px"}}>
+      <p style={{fontSize:"11px",fontWeight:"500",color:"var(--color-text-secondary)",textTransform:"uppercase",letterSpacing:"0.06em",margin:"0 0 6px"}}>{title}</p>
+      {children}
+    </div>
+  );
+}
+
+function Alert({type,title,body}){
+  const c=type==="danger"?{bg:"var(--color-background-danger)",border:"var(--color-border-danger)",text:"var(--color-text-danger)"}:
+    {bg:"var(--color-background-info)",border:"var(--color-border-info)",text:"var(--color-text-info)"};
+  return(
+    <div style={{background:c.bg,border:`0.5px solid ${c.border}`,borderRadius:"var(--border-radius-md)",padding:"10px",marginTop:"8px"}}>
+      <p style={{fontSize:"12px",fontWeight:"500",color:c.text,margin:"0 0 3px"}}>{title}</p>
+      <p style={{fontSize:"12px",color:c.text,margin:0,lineHeight:"1.5"}}>{body}</p>
+    </div>
+  );
+}
+
+function WorkoutTab({s}){
+  const bands=[
+    {c:"Yellow",r:"~5–15 lbs",u:"Warm-up / mobility / shoulder-safe activation — ALWAYS START HERE"},
+    {c:"Blue",r:"~15–25 lbs",u:"Main working sets — seated row, pull-through, core"},
+    {c:"Red",r:"~25–35 lbs",u:"Progressive lower body — hip bridge, lateral walk"},
+    {c:"Green",r:"Medium-Heavy",u:"Hip/glute bridges, seated cable-style rows"},
+    {c:"Black",r:"Extra Heavy",u:"Advanced — add only when pain levels ≤2 across all joints"},
+  ];
+  const ex=s==="red"?["Yellow band only — seated pull-aparts x5","Rest 3 min after","Stop at any dizziness or lightheadedness","No gym — no sauna — home rest"]:
+    s==="yellow"?["Yellow: seated pull-aparts x10","Blue: seated row x10","Hip bridge x10 bodyweight","10 min flat walk only","No sauna today"]:
+    ["Yellow: pull-aparts x15 — warm-up","Blue: seated row 3×12","Red: hip bridge 3×15","Green: lateral band walk 3×10","Calf raises 3×20","Sauna: 15–20 min — hydrate 16oz first","Exit immediately if lightheaded"];
+  return(
+    <div>
+      <Sec title="Band Sequence (Yellow → Black)">
+        {bands.map((b,i)=><Row key={b.c} label={`${b.c} Band`} sub={`${b.r} — ${b.u}`} last={i===bands.length-1}/>)}
+      </Sec>
+      <Sec title={`Session Protocol — ${s==="red"?"Crisis-Safe":s==="yellow"?"Adapted":"Full"}`}>
+        {ex.map((e,i)=><Row key={i} label={e} last={i===ex.length-1}/>)}
+      </Sec>
+      <Alert type="danger" title="Hard Constraints Active" body="No overhead movements • No arm-raising above shoulder • No weighted vest • Stop immediately at lightheadedness • Bilateral shoulder impingement + bilateral knee arthritis + chronic lower back — all active"/>
+    </div>
+  );
+}
+
+function EducationTab({s}){
+  const thm=s==="red"?["Open TryHackMe — read 1 page","Close immediately — rest"]:
+    s==="yellow"?["Existing path only — no new modules","1 challenge — 15 min cap"]:
+    ["Review prior session notes (5 min)","Complete 1–2 modules — 3-month path","Write key takeaways in notebook","30 min cap per session"];
+  const sp=s==="red"?["Dreaming Spanish: 5 min passive video only — no active recall"]:
+    s==="yellow"?["Dreaming Spanish: 15 min comprehensible input"]:
+    ["Dreaming Spanish: 20–30 min daily","Comprehensible input at current level","No grammar drilling — immersion only","Target: survival fluency by June 2026"];
+  return(
+    <div>
+      <Sec title="TryHackMe — 3-Month Path">
+        {thm.map((t,i)=><Row key={i} label={t} last={i===thm.length-1}/>)}
+      </Sec>
+      <Sec title="Dreaming Spanish">
+        {sp.map((t,i)=><Row key={i} label={t} last={i===sp.length-1}/>)}
+      </Sec>
+      <Sec title="Spain Trip — June 2026">
+        <Row label="Keith self-sufficiency budget" tag="$600"/>
+        <Row label="Regla cash-envelope budget" tag="$1,150"/>
+        <Row label="6-hour time offset protocol" sub="Plan communications around Spain/FL time gap" last/>
+      </Sec>
+    </div>
+  );
+}
+
+function SocialTab({now}){
+  const h=now.getHours();
+  const contacts=[
+    {n:"Mom",w:"08:00–22:00",open:h>=8&&h<22},
+    {n:"Dad",w:"16:00–21:00",open:h>=16&&h<21},
+    {n:"Brother",w:"17:00–20:00",open:h>=17&&h<20},
+    {n:"Sister",w:"19:00–21:00",open:h>=19&&h<21},
+    {n:"Regla — Wife",w:"All Day",open:true},
+  ];
+  return(
+    <div>
+      <Sec title="Contact Windows — Live Status">
+        {contacts.map((c,i)=>(
+          <Row key={c.n} label={c.n} sub={c.w} tag={c.open?"Open":"Closed"} tagType={c.open?"open":"closed"} last={i===contacts.length-1}/>
+        ))}
+      </Sec>
+      <Sec title="Social Constraints">
+        <Row label="Intimacy — wife-centric only" sub="Date Night scheduled block — no unsolicited seeking outside block"/>
+        <Row label="No war / combat media" sub="PTSD trigger sensitivity 7/10 — hard constraint active"/>
+        <Row label="Noise / loud environments" sub="Sound sensitivity active — avoid crowded / high-decibel spaces" last/>
+      </Sec>
+      <Alert type="info" title="Soundcore Q30 EQ Active" body="1.6kHz +4 | 3.2kHz +5 — speech decoding compensation for sensorineural hearing loss (1.6–3.2kHz range)"/>
+    </div>
+  );
+}
+
+function PetsTab({s}){
+  const tasks=s==="red"?["Fill one food bowl only","Return to rest immediately","Ask Regla to complete remaining tasks"]:
+    s==="yellow"?["Feed all 4 pets (cats × 3, dog × 1)","Check all water bowls","Skip litter if back pain >4/10"]:
+    ["Feed 3 cats + dog","Clean all litter boxes","Refresh all water bowls","10 min low-impact dog play (seated or flat walk)","Weekly: flea + heartworm check"];
+  return(
+    <div>
+      <Sec title={`Pet Care — ${s==="red"?"Minimal Mode":s==="yellow"?"Reduced":"Full Protocol"}`}>
+        {tasks.map((t,i)=><Row key={i} label={t} last={i===tasks.length-1}/>)}
+      </Sec>
+      <Sec title="Household Constraints">
+        <Row label="No high-sodium items in meal prep" sub="GERD + Gastritis protocol active"/>
+        <Row label="No soy-based products" sub="System constraint — check all labels"/>
+        <Row label="CPAP maintenance" sub="Check mask seal + humidifier water — weekly"/>
+        <Row label="Digital Wellbeing caps" sub="YouTube 30 min • Netflix 90 min — enforced" last/>
+      </Sec>
+    </div>
+  );
+}
+
+function FinanceTab(){
+  const liquid=[
+    {l:"VyStar Money Market",v:"$10,028.78"},
+    {l:"Spain Trips Savings",v:"$1,761.92"},
+    {l:"Bills Account",v:"$1,128.45"},
+    {l:"Emergency Fund",v:"$1,057.46"},
+    {l:"Home Sinking Fund",v:"$740.04"},
+    {l:"Keith Checking",v:"$440.15"},
+    {l:"Wife Savings",v:"$146.41"},
+  ];
+  const debts=[
+    {l:"M&T Mortgage",v:"$239,167",s:"$1,657/mo"},
+    {l:"Beyond Finance",v:"$46,796 enrolled",s:"$382/mo — ends Oct 2029"},
+    {l:"Military Star Card",v:"$6,623",s:"$155/mo"},
+    {l:"EdFinancial Student Loans",v:"$22,767",s:"Deferred to Aug 2026"},
+  ];
+  const chargeoffs=[
+    {l:"CarMax",v:"$10,024"},{l:"NFCU",v:"$25,253"},{l:"NFCU (2)",v:"$3,117"},
+    {l:"CFNA",v:"$4,050"},{l:"EnerBank",v:"$2,139"}
+  ];
+  return(
+    <div>
+      <Sec title="Monthly Income">
+        <Row label="VA Disability — 100% P&T" sub="Tax-free" tag="$4,158.17"/>
+        <Row label="SSDI" sub="Monthly benefit" tag="$1,858.00"/>
+        <Row label="Total" tag="$6,016.17" last/>
+      </Sec>
+      <Sec title="Liquid Assets (4/2/2026)">
+        {liquid.map((a,i)=><Row key={a.l} label={a.l} tag={a.v} last={i===liquid.length-1}/>)}
+      </Sec>
+      <Sec title="Active Debt Obligations">
+        {debts.map((d,i)=><Row key={d.l} label={d.l} sub={d.s} tag={d.v} last={i===debts.length-1}/>)}
+      </Sec>
+      <Sec title="Charge-Offs">
+        {chargeoffs.map((c,i)=><Row key={c.l} label={c.l} tag={c.v} last={i===chargeoffs.length-1}/>)}
+      </Sec>
+      <Alert type="info" title="Spain June 2026" body="Keith: $600 self-sufficiency • Regla: $1,150 cash envelope • 6-hr time offset protocol • Savings target: build Spain Fund to $1,750 minimum"/>
+    </div>
+  );
+}
+
+export default function App(){
+  const [phase,setPhase]=useState("q");
+  const [answers,setAnswers]=useState(()=>{
+    const o={};
+    Object.values(Q_GROUPS).flat().forEach(q=>o[q.id]=q.val);
+    return o;
+  });
+  const [symptom,setSymptom]=useState("green");
+  const [now,setNow]=useState(new Date());
+  const [tab,setTab]=useState("workout");
+  const [countdown,setCountdown]=useState("");
+  const [proofIdx,setProofIdx]=useState(0);
+
+  useEffect(()=>{
+    const iv=setInterval(()=>{
+      const n=new Date();
+      setNow(n);
+      const{endMins}=getCurrentEntry(n);
+      const cur=n.getHours()*60+n.getMinutes();
+      let rem=endMins-cur;
+      if(rem<0)rem+=1440;
+      const h=Math.floor(rem/60),m=rem%60;
+      setCountdown(`${h>0?h+"h ":""}${m}m left`);
+      setProofIdx(p=>(p+1)%10);
+    },3000);
+    return()=>clearInterval(iv);
+  },[]);
+
+  const handleChange=(id,v)=>setAnswers(a=>({...a,[id]:v}));
+  const {entry}=getCurrentEntry(now);
+  const steps=entry[symptom]||entry.green;
+  const sc=SC[symptom];
+
+  if(phase==="q") return(
+    <div style={{fontFamily:"var(--font-sans)",maxWidth:"600px",margin:"0 auto",padding:"1rem 0.75rem 3rem"}}>
+      <h2 style={{fontSize:"18px",fontWeight:"500",margin:"0 0 4px"}}>Forever Life OS — Atomic Ingestion</h2>
+      <p style={{fontSize:"13px",color:"var(--color-text-secondary)",margin:"0 0 1.5rem"}}>Pre-loaded from your system profile. Adjust current state and submit.</p>
+      {Object.entries(Q_GROUPS).map(([grp,fields])=>(
+        <div key={grp} style={{marginBottom:"1.5rem"}}>
+          <p style={{fontSize:"11px",fontWeight:"500",color:"var(--color-text-secondary)",textTransform:"uppercase",letterSpacing:"0.06em",margin:"0 0 8px"}}>{grp}</p>
+          <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"1rem 1.25rem",display:"flex",flexDirection:"column",gap:"14px"}}>
+            {fields.map(q=>(
+              <div key={q.id}>
+                <label style={{fontSize:"13px",color:"var(--color-text-secondary)",display:"block",marginBottom:"4px"}}>{q.label}</label>
+                {q.type==="range"?(
+                  <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
+                    <input type="range" min={q.min} max={q.max} step="1" value={answers[q.id]} onChange={e=>handleChange(q.id,e.target.value)} style={{flex:1}}/>
+                    <span style={{fontSize:"14px",fontWeight:"500",minWidth:"36px",textAlign:"right"}}>{answers[q.id]}{q.max==="100"?"%":""}</span>
+                  </div>
+                ):q.type==="select"?(
+                  <select value={answers[q.id]} onChange={e=>handleChange(q.id,e.target.value)}>
+                    {q.opts.map(o=><option key={o}>{o}</option>)}
+                  </select>
+                ):q.type==="text"?(
+                  <input type="text" value={answers[q.id]} onChange={e=>handleChange(q.id,e.target.value)} placeholder="Optional"/>
+                ):(
+                  <input type="number" value={answers[q.id]} onChange={e=>handleChange(q.id,e.target.value)}/>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      <button onClick={()=>setPhase("dash")} style={{width:"100%",padding:"14px",fontSize:"15px",fontWeight:"500",borderRadius:"var(--border-radius-lg)",cursor:"pointer",background:"var(--color-background-info)",color:"var(--color-text-info)",border:"0.5px solid var(--color-border-info)"}}>Submit to System →</button>
+    </div>
+  );
+
+  return(
+    <div style={{fontFamily:"var(--font-sans)",maxWidth:"600px",margin:"0 auto",padding:"0.75rem 0.75rem 3rem"}}>
+      <h2 className="sr-only">Forever Life Operating System Dashboard</h2>
+
+      {/* Header */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}}>
+        <div>
+          <p style={{fontSize:"10px",fontWeight:"500",color:"var(--color-text-tertiary)",letterSpacing:"0.08em",margin:0}}>FOREVER LIFE OS — KEITH TAYLOR</p>
+          <p style={{fontSize:"13px",fontWeight:"500",margin:"2px 0 0"}}>{now.toLocaleString("en-US",{weekday:"short",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</p>
+        </div>
+        <button onClick={()=>setPhase("q")} style={{fontSize:"11px",padding:"4px 10px"}}>Update Profile</button>
+      </div>
+
+      {/* Symptom Slider */}
+      <div style={{background:"var(--color-background-primary)",border:`0.5px solid ${sc.border}`,borderRadius:"var(--border-radius-lg)",padding:"12px",marginBottom:"10px"}}>
+        <p style={{fontSize:"10px",fontWeight:"500",color:"var(--color-text-secondary)",letterSpacing:"0.06em",margin:"0 0 8px"}}>SYMPTOM STATE — ADAPTIVE GRANULARITY</p>
+        <div style={{display:"flex",gap:"6px"}}>
+          {["green","yellow","red"].map(s=>(
+            <button key={s} onClick={()=>setSymptom(s)} style={{
+              flex:1,padding:"9px 4px",borderRadius:"var(--border-radius-md)",fontSize:"12px",fontWeight:"500",cursor:"pointer",
+              background:symptom===s?SC[s].bg:"transparent",
+              color:symptom===s?SC[s].text:"var(--color-text-secondary)",
+              border:`${symptom===s?"1px":"0.5px"} solid ${symptom===s?SC[s].border:"var(--color-border-tertiary)"}`,
+            }}>
+              {s==="green"?"● Optimal":s==="yellow"?"● Medium":"● Crisis"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Present Moment */}
+      <div style={{background:sc.bg,border:`1px solid ${sc.border}`,borderRadius:"var(--border-radius-lg)",padding:"16px",marginBottom:"10px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"10px"}}>
+          <div>
+            <p style={{fontSize:"10px",fontWeight:"500",color:sc.text,letterSpacing:"0.06em",margin:"0 0 4px",opacity:0.65}}>PRESENT MOMENT</p>
+            <p style={{fontSize:"22px",fontWeight:"500",color:sc.text,margin:"0 0 2px"}}>{entry.task}</p>
+            <p style={{fontSize:"12px",color:sc.text,margin:0,opacity:0.7}}>{entry.category} dimension</p>
+          </div>
+          <div style={{textAlign:"right",flexShrink:0,marginLeft:"12px"}}>
+            <p style={{fontSize:"10px",color:sc.text,opacity:0.6,margin:0,letterSpacing:"0.04em"}}>NEXT STATE</p>
+            <p style={{fontSize:"15px",fontWeight:"500",color:sc.text,margin:"2px 0 0"}}>{countdown}</p>
+          </div>
+        </div>
+        <div style={{borderTop:`0.5px solid ${sc.border}`,paddingTop:"10px"}}>
+          <p style={{fontSize:"10px",fontWeight:"500",color:sc.text,letterSpacing:"0.06em",margin:"0 0 8px",opacity:0.65}}>
+            {symptom==="red"?"ATOMIC MICRO-STEPS":symptom==="yellow"?"ADAPTED STEPS":"OPTIMAL STEPS"}
+          </p>
+          {steps.map((step,i)=>(
+            <div key={i} style={{display:"flex",gap:"8px",marginBottom:"6px",alignItems:"flex-start"}}>
+              <span style={{fontSize:"12px",color:sc.text,opacity:0.5,minWidth:"16px",paddingTop:"2px",flexShrink:0}}>{i+1}.</span>
+              <p style={{fontSize:"14px",color:sc.text,margin:0,lineHeight:"1.5"}}>{step}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Infinity Proof Console */}
+      <div style={{background:"var(--color-background-secondary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-md)",padding:"10px 12px",marginBottom:"12px",display:"flex",gap:"8px",alignItems:"flex-start"}}>
+        <span style={{fontSize:"14px",color:"var(--color-text-tertiary)",flexShrink:0,marginTop:"1px"}}>∞</span>
+        <p style={{fontFamily:"var(--font-mono)",fontSize:"11px",color:"var(--color-text-secondary)",margin:0,lineHeight:"1.6"}}>{PROOFS(symptom,answers)[proofIdx]}</p>
+      </div>
+
+      {/* Tabs */}
+      <div style={{display:"flex",gap:"4px",marginBottom:"10px",overflowX:"auto",paddingBottom:"2px",scrollbarWidth:"none"}}>
+        {["workout","education","social","pets","finance"].map(t=>(
+          <button key={t} onClick={()=>setTab(t)} style={{
+            padding:"6px 14px",borderRadius:"var(--border-radius-md)",fontSize:"12px",fontWeight:"500",
+            whiteSpace:"nowrap",cursor:"pointer",flexShrink:0,
+            background:tab===t?"var(--color-background-info)":"transparent",
+            color:tab===t?"var(--color-text-info)":"var(--color-text-secondary)",
+            border:`0.5px solid ${tab===t?"var(--color-border-info)":"var(--color-border-tertiary)"}`,
+          }}>{t.charAt(0).toUpperCase()+t.slice(1)}</button>
+        ))}
+      </div>
+
+      {/* Tab Panel */}
+      <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"1rem 1.25rem"}}>
+        {tab==="workout"&&<WorkoutTab s={symptom}/>}
+        {tab==="education"&&<EducationTab s={symptom}/>}
+        {tab==="social"&&<SocialTab now={now}/>}
+        {tab==="pets"&&<PetsTab s={symptom}/>}
+        {tab==="finance"&&<FinanceTab/>}
+      </div>
+    </div>
+  );
+}
